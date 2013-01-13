@@ -27,64 +27,87 @@ As should be obvious, data is stored as discrete points on one or more dimension
 # Example Syntax
 For the benefit of implementors, consider the following example syntax:
 ## Binary Operators
-### ->
-lvalue: dimension
-rvalue: dimension
-semantics: The rvalue is a child dimension of the rvalue.
-### .
-lvalue: dimension
-rvalue: key
-semantics: The rvalue is a key from the lvalue dimension
-### :
-lvalue: qualified key, value, dimension
-rvalue: command
-semantics: issues command specified in rvalue using the lvalue as the first argument.  Implementors should type-check the lvalue and issue an error if the type does not match the expected type of the first argument to the command specified in rvalue.
-### =
-lvalue: qualified key [if key is unqualified, implementors are permitted to use an arbitrary 'default' orphaned dimension; thus, using an unqualified key as an lvalue will invoke implementation-defined behaviour only in the case of unorthodox database models]
-rvalue: value
-semantics: the data-point referred to by the lvalue is set to the rvalue
-### ==
-lvalue: qualified key or value
-rvalue: qualified key or value
-semantics: compares the lvalue to the rvalue, returns the boolean values TRUE or FALSE depending on whether the rvalue and rvalue are equivalent.  If the types differ and are not comparable, implementors are free either to return either value or to consider the syntax invalid and issue an error.  Comparing data of two different types is implementation-defined.
-### -
-lvalue: qualified key
-rvalue: value
-semantics: reduces the data point referred to by lvalue by the value specified in rvalue.  In the case of complex data types (dimensions, strings, etc.), the implementor is free to decide how the semantics of this operator should work (or to consider it an error).
-### +
-lvalue: qualified key
-rvalue: value
-semantics: see "-", this is the semantic inverse of that
+
+### `->`
+
+ * lvalue: dimension
+ * rvalue: dimension
+ * semantics: The rvalue is a child dimension of the rvalue.
+
+### `.`
+
+ * lvalue: dimension
+ * rvalue: key
+ * semantics: The rvalue is a key from the lvalue dimension
+
+### `:`
+
+ * lvalue: qualified key, value, dimension
+ * rvalue: command
+ * semantics: issues command specified in rvalue using the lvalue as the first argument.  Implementors should type-check the lvalue and issue an error if the type does not match the expected type of the first argument to the command specified in rvalue.
+
+### `=`
+
+ * lvalue: qualified key [if key is unqualified, implementors are permitted to use an arbitrary 'default' orphaned dimension; thus, using an unqualified key as an lvalue will invoke implementation-defined behaviour only in the case of unorthodox database models]
+ * rvalue: value
+ * semantics: the data-point referred to by the lvalue is set to the rvalue
+
+### `==`
+
+ * lvalue: qualified key or value
+ * rvalue: qualified key or value
+ * semantics: compares the lvalue to the rvalue, returns the boolean values TRUE or FALSE depending on whether the rvalue and rvalue are equivalent.  If the types differ and are not comparable, implementors are free either to return either value or to consider the syntax invalid and issue an error.  Comparing data of two different types is implementation-defined.
+
+### `-`
+
+ * lvalue: qualified key
+ * rvalue: value
+ * semantics: reduces the data point referred to by lvalue by the value specified in rvalue.  In the case of complex data types (dimensions, strings, etc.), the implementor is free to decide how the semantics of this operator should work (or to consider it an error).
+
+### `+`
+
+ * lvalue: qualified key
+ * rvalue: value
+ * semantics: see "-", this is the semantic inverse of that
+
 ### Keywords
 
-### Unique
-Applies to: Keys
-Effect: disallows a User Interface or API from inserting a duplicate key.  An error is produced in these circumstances and the record is not committed to the database.  Implementors should take advantage of the 'unique' keyword to implement efficient storage and retrieval algorithms (as as tries for string-based keys).
-### Auto-increment
-Applies to: Keys, Values
-Effect: in the case of Keys, inserting to the special-case '!' key will increment the largest 'key' value by one and insert the new value at that point on the Dimension.  Implementor's note: you may provide an incrementation algorithm which takes note of 'gaps' to preserve contiguity.
-### Orphaned
-Applies to: Dimensions
-Effect: creates the new Dimension with no parent-perpendicular dimensions.  There must be at least one Orphaned Dimension in every database, and there may be more than one.  It's not recommended to use the database in this way, however, and implementors are permitted to treat multiple orphaned dimensions as a special case.
+### `unique`
+- Applies to: Keys
+- Effect: disallows a User Interface or API from inserting a duplicate key.  An error is produced in these circumstances and the record is not committed to the database.  Implementors should take advantage of the 'unique' keyword to implement efficient storage and retrieval algorithms (as as tries for string-based keys).
+
+### `increment`
+- Applies to: Keys, Values
+- Effect: in the case of Keys, inserting to the special-case '!' key will increment the largest 'key' value by one and insert the new value at that point on the Dimension.  Implementor's note: you may provide an incrementation algorithm which takes note of 'gaps' to preserve contiguity.
+
+### `orphan`
+- Applies to: Dimensions
+- Effect: creates the new Dimension with no parent-perpendicular dimensions.  There must be at least one Orphaned Dimension in every database, and there may be more than one.  It's not recommended to use the database in this way, however, and implementors are permitted to treat multiple orphaned dimensions as a special case.
+
 ## Commands
 Commands can either be issued "procedurally", or can be considered methods on their first argument.
+
 Each command gives an example of both uses, in case you're confused.
+
 All commands return their first argument after modification.  So you can string commands together easily.
-### set
-argument list: qualified key, (qualified key | value) [, boolean=true]
-semantics: sets the value of the first argument to the second argument or the value referred to by the second argument.  If the key doesn't exist, it will be created as long as the boolean argument is unprovided or 'true'.
-usage examples: 
+
+### `set`
+- argument list: qualified key, (qualified key | value) [, boolean=true]
+- semantics: sets the value of the first argument to the second argument or the value referred to by the second argument.  If the key doesn't exist, it will be created as long as the boolean argument is unprovided or 'true'.
+- usage examples: 
  - set(character.yoda->data.gold,23)
  - character.yoda->data.gold:set(23,false)
-### delete
-argument list: (qualified key | dimension) [, boolean=false]
-semantics: deletes the specified key or dimension.  If the second argument is false or not provided the command will preserve as much data as possible, if it is true it will purge any data associated with the first argument
-usage examples:
+
+### `delete`
+- argument list: (qualified key | dimension) [, boolean=false]
+- semantics: deletes the specified key or dimension.  If the second argument is false or not provided the command will preserve as much data as possible, if it is true it will purge any data associated with the first argument
+- usage examples:
  - delete(character.yoda)
  - character.yoda->data:delete(true) // (will delete the 'data' dimension just from the 'yoda' data point, use 'character->data:delete()' to delete it entirely from the 'character' dimension)
-### print
-argument list: (qualified key | dimension | value)
-semantics: prints the argument to stdout.  If it's a qualified key, the key and its associated value will be printed.  If it's a value, the value will be printed.  If it's a dimension, the dimension, all its keys and all data points will be printed in tabular format.  Any child dimensions will just be listed by name.
-usage examples:
+
+### `print`
+- argument list: (qualified key | dimension | value)
+- semantics: prints the argument to stdout.  If it's a qualified key, the key and its associated value will be printed.  If it's a value, the value will be printed.  If it's a dimension, the dimension, all its keys and all data points will be printed in tabular format.  Any child dimensions will just be listed by name.
+- usage examples:
  - print(character)
  - character.yoda->data:print
