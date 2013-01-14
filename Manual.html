@@ -1,0 +1,233 @@
+<html>
+<head>
+	<title>Dimensional Database Manual</title>
+	<link href="google-code-prettify/prettify.css" type="text/css" rel="stylesheet" />
+	<script type="application/javascript" src="google-code-prettify/prettify.js"></script>
+	<script type="application/javascript">
+	function loadFunc() {
+		prettyPrint();
+	}
+	</script>
+	<style type="text/css">
+	.pretable {
+		border-collapse:collapse;
+	}
+	.pretable tr td {
+		border:solid 1px #000000;
+		padding:0.25em;
+	}
+	.pretable tr td:first-child {
+		border:none;
+	}
+	
+	</style>
+</head>
+<body onload="loadFunc()">
+Example session (C++):
+<pre class="prettyprint">
+#include "cckd.hpp"
+
+using namespace cckd;
+int main(void)
+{
+	// declares a dimension with a keytype of 'unique string'; value types are unrestricted
+	Dimension person("person","unique string");
+	// usually you wouldn't use add_key, as keys are automatically generated
+	// with whatever value type seems appropriate
+	// however, for demonstration purposes we'll explicitly set the 'age' key to use 'int' values
+	// this will prevent people from using string types in the future
+	// add_key is therefore more useful for string types so you can add what would otherwise
+	// be interpreted as an int as your first value
+	person.add_key("age","int");
+	// declares a dimension with a keytype of 'unique string'; value types are restricted to "person"
+	Dimension people("people","unique string","person");
+	
+	// you can pass 'people' into the constructor as the default orphaned dimension, but 
+	// for demonstration purposes I'm showing it based on an "empty" database
+	Database offline_peopledb(); 
+	
+	// add_orphaned_dimension is provided for creating multiple orphaned dimensions,
+	// but this model is expressly not recommended by the author and implementors
+	// are free to disable this function if they don't want to provide this
+	// functionality.
+	offline_peopledb.add_orphaned_dimension("people");
+	
+	// chris_data can be used to access the data we just input later on, or discarded.
+	QualifiedKey chris_data = offline_peopledb
+	// this '.set()' method returns a QualifiedKey pointing to
+	// a newly-created 'person' data point on the 'people' dimension
+	.set("chris","person")
+	// this '.set()' method returns a QualifiedKey pointing to the 'age' and 'occupation' of 'chris'
+	// it also creates the 'occupation' key automagically to use string data types.
+	// note that in C++ you need to escape the backslash that escapes the comma
+	// I use backslash escaping in strings because it's intuitive to me
+	.set("age,occupation","23,programmer\\,unemployed");
+	// really, the comma syntax is only provided for convenience and is not necessarily more efficient
+	// than calling .set() twice.  See your implementation manual for the efficiency difference between the two
+	
+	
+	// now let's connect to a network-accessible database store
+	Database online_peopledb("127.0.0.1","2031","root","my_password","people");
+	
+	// phew, that was hard work - but that's the internet for you
+	// now let's sync the two databases!
+	// set with only one argument sets the value of the orphaned 
+	// dimension (if called on a Database object) or the parent Dimension
+	// (if called on a QualifiedKey that refers to a Dimension)
+	// or the value referred to by the QualifiedKey in all other cases, actually
+	online_peopledb.set(offline_peopledb
+	// .get with no arguments returns a QualifiedKey for the Dimension
+	// that it's called on.  If you call it on a QualifiedKey that is not a Dimension, an error is issued
+	.get());
+	
+	// it really is as simple as that, as long as you only have one orphaned dimension
+	// multiple orphaned dimensions will need to be synced one at a time
+	
+	// normally, all objects are deleted when they go out of scope of main
+	// and implicitly cleaned up by the C++ runtime library.  However, 
+	// for demonstration purposes let's call some clean-up methods that
+	// are usually provided for re-using database objects (for example if
+	// we wanted to use the same object for the 'offline' and 'online' versions
+	// of 'peopledb' above)
+	offline_peopledb.close(); // because there are no associated resources (files, network connections or otherwise), this command is virtually
+							  // meaningless except that it will return the offline_peopledb object to a newly-created state
+
+	// the following .close() command does the same as the above but also
+	// closes the outstanding connection to 127.0.0.1:2031 and cleans up
+	// related network resources
+	online_peopledb.close();
+	
+	// we're going to re-open the database with a file back-end to better
+	// demonstrate the function that follows it
+	online_peopledb.open(std::ifstream("demo_file.ckd"));
+	QualifiedKey chris_data = online_peopledb.get("chris");
+	
+	// the following method is more useful for file-based databases that are accessed by multiple programs
+	// than network databases, but it will work on any database
+	// in this case, it just closes the network connections, cleans up and leaves any memcached structure behind.
+	// note that this may be unreliable in some implementations, as it's entirely up to the implementor how much
+	// data is left behind by this command.  It's therefore preferable to use .close() and re-open the connection
+	// later for further operations.  This is one of the many methods provided mainly with a view to making
+	// life easier for cache implementors/administrators
+	online_peopledb.disconnect();
+	
+	// had we just called .close, the following would not work:
+	chris_data.print("occupation,age",true);
+	// note that the boolean just tells it to prepend the name of the key (in this case "chris", in the case of an orphaned dimension, nothing is printed for the name)
+	// so the output should look like this:
+	//	[person]	[occupation]		  |	[age]
+	//	chris:		programmer,unemployed | 23
+	
+	// but we can't get other keys out of the database any more:
+	online_peopledb.get("miranda").print("occupation,age");
+	// would return the following:
+	//	[person]	[occupation]		  |	[age]
+	// ** no records found **
+	
+	// ok, we're a bit fed up of that so let's open a new example database and show some different data retrieval methods we can use
+	// this time we're going to be careful and also purposely show off Exception generation
+	try {
+		Database accounts(std::ifstream("accounts_example.ckd"));
+	} catch(DatabaseException e) {
+		// e.what() will return a reason for the error, in accordance with std::exception's behaviour (DatabaseException inherits from std::exception)
+		std::cout &lt;&lt; e.what();
+		return !0;
+	}
+	// note that most functions can throw exceptions and use them to indicate to the caller that
+	// exceptional circumstances occurred (for instance, .set() throws a DatabaseException if the value given is invalid in context)
+	
+	// NOTE: in the following examples, the database structure is unorthodox
+	// and could be vastly improved, but is contrived to demonstrate as much
+	// of the API as possible
+	
+	// now, assuming that 'accounts' opened alright, let's move on
+	accounts.print()
+	// ok, that's a pretty simple call, but what does it do?
+	// well, see for yourself:
+<table class="pretable">
+<tr><td><pre>	//</pre></td><td>[accounts]</td><td>[account]</td><td>[account_type]</td></tr>
+<tr><td><pre>	//</pre><td>current_account</td><td>[account]</td><td>asset</td></tr>
+<tr><td><pre>	//</pre><td>savings_account</td><td>[account]</td><td>asset</td></tr>
+</table>
+	// if there are multiple orphaned dimensions, it will print them out one by one.  
+	// In this case, we might have orphaned "chris_accounts" and "miranda_accounts"
+	// but it's preferable in that case to use a single orphaned database called "all_accounts"
+	// with key-type "string" and value type "accounts", so that you can then add/remove accounts without having to add more orphaned dimensions,
+	// you can just add a new key to the database and as much data as you want all at once.  huzzah!
+	
+	// let's get some information about my current account (made up, I should point out)
+	accounts.get("current_account").print();
+	// output:
+<table class="pretable">
+<tr><td><pre>	//</pre></td><td>[account]</td><td>[balance]</td><td>[transactions]</td></tr>
+<tr><td><pre>	//</pre><td>current_account</td><td>0.00</td><td>[transaction]</td></tr>
+</table>
+
+	// it looks like there's some more interesting data to find in the 'transaction' dimension, so let's follow that
+	QualifiedKey current_account = accounts.get("current_account"); // first save the current account in a variable
+	QualifiedKey transactions = current_account.get("transactions"); // get all the transactions for the current account
+	transactions.sort("date",SO_DESCENDING).print(); // finally, print the transactions (sorted by date, descending)
+	// output:
+<table class="pretable">
+<tr><td><pre>	//</pre></td><td>[transaction]</td><td>[notes]</td><td>[start_balance]</td><td>[end_balance]</td><td>[difference]</td><td>[date]</td></tr>
+<tr><td><pre>	//</pre></td><td>Payment to: XBOX LIVE LUXEMBOURG</td><td>bought 500 MS points</td><td>5.99</td><td>0.00</td><td>-5.99</td><td>01:45 14/01/2013</td></tr>
+<tr><td><pre>	//</pre></td><td>Counter-credit: deposited 5.99</td><td>to buy some MS points!</td><td>0.00</td><td>5.99</td><td>5.99</td><td>12:00 10/01/2013</td></tr>
+</table>
+	
+	// now, just then we used the new 'sort' method to sort a table, but did it affect the underlying structure?
+	// well, the answer is both yes and no.  The actual database is kept in an order that's always sorted by the key of the database, ascending
+	// so in the above example, it would otherwise have been sorted by column 0 (containing "Payment to: XBOX LIVE LUXEMBOURG", etc.)
+	// so what did I mean by "yes and no"?  Surely that's just "no"?
+	// well, the QualifiedKey that's returned from sort <em>is</em> affected.  So if you store that (which we didn't), future calls will still be
+	// sorted.  This may seem counter-intuitive to a degree, as in the above example "transactions" is not affected by the .sort call, whereas
+	// if we had saved sorted_transactions = transactions.sort() then sorted_transactions would be affected.
+	
+	// what if we want to sort a table and store the sorted result?
+	// well, it's not strictly possible - the database is sorted by its key for a reason - but we can "shift" a dimension to use a different key, like so:
+	transactions.shift("name","date");
+	
+	// transactions now looks (something) like this:
+<table class="pretable">
+<tr><td><pre>	//</pre></td><td>[transaction]</td><td>[notes]</td><td>[start_balance]</td><td>[end_balance]</td><td>[difference]</td><td>[name]</td></tr>
+<tr><td><pre>	//</pre></td><td>01:45 14/01/2013</td><td>bought 500 MS points</td><td>5.99</td><td>0.00</td><td>-5.99</td><td>Payment to: XBOX LIVE LUXEMBOURG</td></tr>
+<tr><td><pre>	//</pre></td><td>12:00 10/01/2013</td><td>to buy some MS points!</td><td>0.00</td><td>5.99</td><td>5.99</td><td>Counter-credit: deposited 5.99</td></tr>
+</table>
+	// now, as you can see, the 'key' for transactions is the <em>date</em>, and the old key has been renamed 'name'
+
+	// what we haven't talked about yet is ordering the "columns" in display - well, usually we expect the application to handle the actual display
+	// rather than using 'print' calls (which are mainly there for convenience for command-line front-ends)
+	// and we provide a few different ways of handling this.  The order of the columns is actually stored as part of a Dimension's data structure
+	// and therefore these changes <em>do</em> affect the underlying data structure.
+	
+	// the first (and most obvious) way of doing it is to use the 'order' method:
+	transactions.order("name,difference,end_balance,notes,start_balance");
+	// (I've positioned 'notes' incorrectly on purpose, we'll fix it later don't worry)
+	
+	// a varargs version of 'order' may be provided by an implementation, but is not guaranteed by this standard
+	// the single-argument, comma-delimited version is guaranteed, however.
+	
+	// you can use "left_shift()" or the &lt;&lt; operator to move a column once to the left
+	transactions &lt;&lt; "difference";
+	
+	// right_shift() and &gt;&gt; do the opposite:
+	transactions.right_shift("difference");
+	
+	// both of these will throw a DatabaseException if the provided argument is an invalid key
+	// another notification mechanism might later be employed to let you know if you're shifting beyond the end of a "table"
+	// but as it stands, I don't know how an implementor would achieve that.
+	// implementors are free to do what they please in that regard, throwing an exception is a possibility, printing a message to std::err or std::out is another
+	// I'd recommend against exceptions as it's intuitive that the shift is just not executed in these circumstances, as it would not
+	// affect the ordering anyway (so you can "pretend" you shifted it if you want, but it's not actually going anywhere in reality)
+	
+	// any columns not mentioned in the argument to "order" are appended in their existing order to the end of the structure
+	// so this:
+	transactions.order("notes");
+	// is the same as this:
+	transactions.left_shift("notes");
+	
+
+	return 0;
+}
+</pre>
+</body>
+</html>
