@@ -6,7 +6,7 @@ The idea is to create a database that supports viewing data as discrete points o
 # Dimensions
 A Dimension has the following properties:
  - Data Type: the type of discrete datapoints on the dimension.  This can be either a list of perpendicular Dimensions or a list of accepted primitive value types, or a mixture of the two.
- - Key Type: the type of the key used to access discrete datapoints on the dimension.  For example, a Dimension with a String key might have data-points at "name", "address" and "email".
+ - Key Type: the type of the key used to access discrete datapoints on the dimension.  For example, a Dimension with a String key might have data-points at "name", "address" and "email".  Using a Dimension as a Key-Type is undefined (implementations may choose to allow it if they can see some use case that I'm as-yet unaware of).
  - Access Specifier: I'm still working on what it means to restrict access to a dimension.  At the moment it involves restricting how you can access a Dimension via related dimensions, but this may evolve into something entirely different.
 
 # Dimensional Relationships
@@ -57,6 +57,12 @@ For the benefit of implementors, consider the following example syntax:
  * lvalue: qualified key or value
  * rvalue: qualified key or value
  * semantics: compares the lvalue to the rvalue, returns the boolean values TRUE or FALSE depending on whether the rvalue and rvalue are equivalent.  If the types differ and are not comparable, implementors are free either to return either value or to consider the syntax invalid and issue an error.  Comparing data of two different types is implementation-defined.
+
+### `!=`
+
+ * lvalue: qualified key or value
+ * rvalue: qualified key or value
+ * semantics: see `==`, of which this operator is the precise inverse.
 
 ### `-`
 
@@ -111,3 +117,25 @@ All commands return their first argument after modification.  So you can string 
 - usage examples:
  - print(character)
  - character.yoda->data:print
+
+## Aliases
+Command versions of operators are provided for convenience.
+The API exposed from the reference implementation uses these as function names, usefully.
+
+### `child`
+Aliases the `->` operator
+
+### `key`
+Aliases the `.` operator
+
+### `is`
+Aliases the `=` operator
+
+### `equals`
+Aliases the `==` and (by extension) `!=` operators.  Just reverse the return value to get to the `!=` operator.
+
+### `minus`
+Aliases the `-` operator
+
+### `plus`
+Aliases the `+` operator
