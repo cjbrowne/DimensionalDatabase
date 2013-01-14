@@ -200,8 +200,7 @@ int main(void)
 	// and therefore these changes <em>do</em> affect the underlying data structure.
 	
 	// the first (and most obvious) way of doing it is to use the 'order' method:
-	transactions.order("name,difference,end_balance,notes,start_balance");
-	// (I've positioned 'notes' incorrectly on purpose, we'll fix it later don't worry)
+	transactions.order("name,difference,end_balance,start_balance,notes");
 	
 	// a varargs version of 'order' may be provided by an implementation, but is not guaranteed by this standard
 	// the single-argument, comma-delimited version is guaranteed, however.
@@ -222,8 +221,9 @@ int main(void)
 	// any columns not mentioned in the argument to "order" are appended in their existing order to the end of the structure
 	// so this:
 	transactions.order("notes");
-	// is the same as this:
+	// is the same as calling:
 	transactions.left_shift("notes");
+	// until 'notes' is at the far left
 	
 
 	return 0;
